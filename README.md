@@ -100,7 +100,7 @@ timeline.html        # The full single-file web app
 timeline.py          # PyWebView launcher for the desktop app
 build.bat            # Build Timeline.exe (Windows)
 run.bat              # Run without building (Windows)
-timeline.ico         # App icon (16 px)
+timeline.ico         # App icon (16-256 px)
 README.md
 CHANGELOG.md
 ```
