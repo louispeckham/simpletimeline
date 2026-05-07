@@ -1,0 +1,2155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Event Timeline</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #2a2a3e;
+    --accent: #e8ff6e;
+    --accent2: #6ef0ff;
+    --text: #e8e8f0;
+    --muted: #8888aa;
+    --danger: #ff6e6e;
+    --now-line: #e8ff6e;
+    --card-bg: #14141e;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── TOP BAR ── */
+  #topbar-wrap {
+    position: relative;
+    z-index: 100;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #topbar-row1, #topbar-row2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 16px;
+  }
+  #topbar-row1 { border-bottom: 1px solid var(--border); }
+
+  #topbar-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    border-radius: 4px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #0a0a0f; border-color: var(--accent); font-weight: 700; }
+  .btn.primary:hover { background: #d4eb5a; border-color: #d4eb5a; color: #0a0a0f; }
+  .btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+  .btn.icon { padding: 6px 10px; font-size: 0.85rem; }
+  .btn.active { border-color: var(--accent2); color: var(--accent2); background: rgba(110,240,255,0.08); }
+
+  .topbar-sep {
+    width: 1px; height: 22px;
+    background: var(--border);
+    flex-shrink: 0;
+  }
+
+  #clock {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    margin-left: auto;
+    white-space: nowrap;
+    min-width: 240px;
+    text-align: right;
+  }
+
+  /* ── SETTINGS MENU ── */
+  #settings-wrap { position: relative; }
+  #settings-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    z-index: 300;
+    min-width: 180px;
+    padding: 6px 0;
+  }
+  #settings-menu.open { display: block; }
+  .menu-item {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text);
+    padding: 9px 16px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.1s, color 0.1s;
+    display: flex; align-items: center; gap: 10px;
+    background: none; border: none; width: 100%; text-align: left;
+  }
+  .menu-item:hover { background: rgba(255,255,255,0.05); color: var(--accent); }
+  .menu-item.danger:hover { color: var(--danger); }
+  .menu-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+  /* ── TASKS PANEL ── */
+  #tasks-panel {
+    display: none;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px 12px;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+    z-index: 90;
+  }
+  #tasks-panel.open { display: flex; }
+  #tasks-header {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  #tasks-list {
+    max-height: 180px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .task-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: border-color 0.12s, opacity 0.3s;
+    animation: task-in 0.15s ease;
+    user-select: none;
+  }
+  @keyframes task-in { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+  .task-row:hover { border-color: var(--accent2); }
+  .task-check {
+    width: 16px; height: 16px; flex-shrink: 0;
+    border: 1.5px solid var(--muted);
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.1s, background 0.1s;
+    color: transparent; font-size: 0.65rem;
+  }
+  .task-row:hover .task-check { border-color: var(--accent2); }
+  .task-text { font-size: 0.78rem; color: var(--text); flex: 1; }
+  #task-add-row { display: flex; gap: 6px; margin-top: 2px; }
+  #task-input {
+    flex: 1; background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 0.78rem; padding: 6px 10px; border-radius: 4px;
+    outline: none; transition: border-color 0.15s;
+  }
+  #task-input:focus { border-color: var(--accent); }
+  #task-input::placeholder { color: var(--muted); }
+  .tasks-empty {
+    font-size: 0.68rem; color: var(--muted);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    text-align: center; padding: 8px 0 2px;
+  }
+
+  /* ── DAY BANNER ── */
+  #day-banner {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 80px;
+    z-index: 18;
+    pointer-events: none;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    padding: 4px 14px;
+  }
+  #day-banner.visible { display: block; }
+
+  /* ── BACK TO NOW ── */
+  #back-to-now {
+    display: none;
+    position: absolute;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 25;
+    background: var(--accent);
+    color: #0a0a0f;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 20px;
+    padding: 7px 18px;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(232,255,110,0.35);
+    transition: background 0.15s;
+  }
+  #back-to-now.visible { display: block; }
+  #back-to-now:hover { background: #d4eb5a; }
+
+  /* ── DRAG HANDLES ── */
+  .card-handle {
+    position: absolute;
+    left: 0; right: 0;
+    height: 10px;
+    cursor: ns-resize;
+    z-index: 5;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .card-handle::after {
+    content: '';
+    width: 32px; height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.35);
+  }
+  .card-handle.top { top: 0; border-radius: 6px 6px 0 0; cursor: n-resize; }
+  .card-handle.bottom { bottom: 0; border-radius: 0 0 6px 6px; cursor: s-resize; }
+  .event-card:hover .card-handle { opacity: 1; }
+  .event-card.dragging { opacity: 0.75; box-shadow: 0 8px 32px rgba(0,0,0,0.5); z-index: 50; }
+  .event-card.dragging .card-handle { opacity: 1; }
+  .event-card { cursor: grab; }
+  .event-card:active { cursor: grabbing; }
+
+  /* ── EVENT FLASH when it starts ── */
+  @keyframes event-flash {
+    0%   { box-shadow: 0 0 0 0   rgba(232,255,110,0);    border-left-color: var(--accent); }
+    20%  { box-shadow: 0 0 24px 8px rgba(232,255,110,0.7); border-left-color: var(--accent); }
+    40%  { box-shadow: 0 0 0 0   rgba(232,255,110,0);    }
+    60%  { box-shadow: 0 0 24px 8px rgba(232,255,110,0.55); }
+    80%  { box-shadow: 0 0 0 0   rgba(232,255,110,0);    }
+    100% { box-shadow: 0 0 24px 8px rgba(232,255,110,0.4);  }
+  }
+  .event-card.flashing {
+    animation: event-flash 1.4s ease-out forwards !important;
+    border-color: var(--accent) !important;
+    z-index: 10 !important;
+  }
+
+  /* ── TIMELINE VIEWPORT ── */
+  #viewport {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    user-select: none;
+  }
+
+  /* Fade gradients top/bottom */
+  #viewport::before, #viewport::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    height: 80px;
+    z-index: 10;
+    pointer-events: none;
+  }
+  #viewport::before {
+    top: 0;
+    background: linear-gradient(to bottom, var(--bg) 0%, transparent 100%);
+  }
+  #viewport::after {
+    bottom: 0;
+    background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
+  }
+
+  /* NOW LINE */
+  #now-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 0;
+    z-index: 20;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 0 20px;
+    pointer-events: none;
+    overflow: visible;
+  }
+  #now-line::before {
+    content: '';
+    display: block;
+    height: 1px;
+    flex: 1;
+    flex-shrink: 0;
+    background: var(--now-line);
+    box-shadow: 0 0 8px var(--now-line), 0 0 24px rgba(232,255,110,0.3);
+    margin-top: 0;
+  }
+  #now-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    background: var(--bg);
+    padding: 2px 6px;
+    white-space: nowrap;
+    transform: translateY(-50%);
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  #now-line::after {
+    content: '';
+    display: block;
+    height: 1px;
+    flex: 1;
+    flex-shrink: 0;
+    background: var(--now-line);
+    box-shadow: 0 0 8px var(--now-line), 0 0 24px rgba(232,255,110,0.3);
+    margin-top: 0;
+  }
+
+  /* SCROLLING TRACK */
+  #track {
+    position: absolute;
+    left: 0; right: 0;
+    /* height computed by JS; top offset managed by JS */
+  }
+
+  /* TIME RULER TICKS */
+  .tick {
+    position: absolute;
+    left: 0; right: 0;
+    height: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 0 20px;
+    pointer-events: none;
+    z-index: 1;
+    overflow: visible;
+  }
+  .tick-line {
+    height: 1px;
+    background: var(--border);
+    flex: 1;
+    flex-shrink: 0;
+    margin-top: 0;
+  }
+  .tick-label {
+    font-size: 0.72rem;
+    color: #b0b0d0;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    min-width: 55px;
+    text-align: right;
+    transform: translateY(-50%);
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .tick.hour .tick-line { background: #2a2a3e; }
+  .tick.hour .tick-label { color: #9090b8; }
+
+  /* EVENT CARDS */
+  .event-card {
+    position: absolute;
+    left: 80px;
+    right: 20px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent2);
+    border-radius: 6px;
+    padding: 10px 30px 10px 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    z-index: 2;
+  }
+  .event-card:hover {
+    border-color: var(--accent);
+    border-left-color: var(--accent);
+    box-shadow: 0 0 12px rgba(232,255,110,0.08);
+  }
+  .event-card.past {
+    opacity: 0.35;
+    border-left-color: var(--muted);
+  }
+  .event-card.ongoing {
+    border-left-color: var(--accent);
+    box-shadow: 0 0 16px rgba(232,255,110,0.12);
+    background: #16161f;
+  }
+  .event-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .event-meta {
+    font-size: 0.8rem;
+    color: #b0b0d0;
+    letter-spacing: 0.04em;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .event-meta span { white-space: nowrap; }
+  .event-delete {
+    position: absolute;
+    top: 6px; right: 7px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.65rem;
+    line-height: 1;
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 3px;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    z-index: 10;
+  }
+  .event-delete:hover {
+    color: var(--danger);
+    border-color: var(--danger);
+    background: rgba(255,110,110,0.15);
+  }
+  .event-card.ongoing .event-delete { background: #16161f; }
+
+  /* ── STICKY CONTENT INSIDE ONGOING CARDS ── */
+  .card-content {
+    position: sticky;
+    top: 0;
+    padding-bottom: 10px;
+  }
+
+  /* ── MODAL ── */
+  #modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  #modal-overlay.open { display: flex; }
+
+  #modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--accent);
+    border-radius: 8px;
+    padding: 28px 28px 24px;
+    width: 420px;
+    max-width: 95vw;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    overflow: visible;
+  }
+  #modal h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+  }
+
+  .field { margin-bottom: 14px; position: relative; overflow: visible; }
+  .field label {
+    display: block;
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #9090b8;
+    margin-bottom: 5px;
+  }
+  .field input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    padding: 8px 10px;
+    border-radius: 4px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus { border-color: var(--accent); }
+
+  .field-row { display: flex; gap: 12px; overflow: visible; }
+  .field-row .field { flex: 1; overflow: visible; }
+
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+
+  /* ── EMPTY STATE ── */
+  #empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+    z-index: 5;
+  }
+  #empty p {
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* hidden file input */
+  #import-input { display: none; }
+
+  /* ── LIST MODAL ── */
+  #list-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 60px;
+    backdrop-filter: blur(4px);
+  }
+  #list-overlay.open { display: flex; }
+
+  #list-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--accent);
+    border-radius: 8px;
+    width: 540px;
+    max-width: 95vw;
+    max-height: calc(100vh - 120px);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    overflow: hidden;
+  }
+
+  #list-header {
+    padding: 20px 22px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #list-header h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    flex: 1;
+  }
+  .tab-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .tab-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .tab-btn.active { border-color: var(--accent2); color: var(--accent2); background: rgba(110,240,255,0.08); }
+
+  #list-body {
+    overflow-y: auto;
+    flex: 1;
+    padding: 10px 14px 14px;
+  }
+
+  .list-empty {
+    text-align: center;
+    padding: 40px 20px;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .list-date-group { margin-bottom: 6px; }
+  .list-date-heading {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 8px 5px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+
+  .list-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.12s;
+    border-left: 2px solid transparent;
+  }
+  .list-row:hover { background: rgba(255,255,255,0.04); }
+  .list-row.ongoing { border-left-color: var(--accent); }
+  .list-row.past { opacity: 0.45; }
+
+  .list-row-time {
+    font-size: 0.75rem;
+    color: #b0b0d0;
+    min-width: 105px;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+  }
+  .list-row-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .list-row-loc {
+    font-size: 0.68rem;
+    color: var(--muted);
+    white-space: nowrap;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .list-row-del {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.65rem;
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 3px;
+    flex-shrink: 0;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .list-row-del:hover { color: var(--danger); border-color: var(--danger); background: rgba(255,110,110,0.1); }
+
+  /* ── COLOUR PICKER ── */
+  .color-field { margin-bottom: 14px; }
+  .color-field label {
+    display: block;
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #9090b8;
+    margin-bottom: 8px;
+  }
+  .color-swatches {
+    display: flex;
+    gap: 7px;
+    flex-wrap: wrap;
+  }
+  .color-swatch {
+    width: 26px; height: 26px;
+    border-radius: 5px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.1s, border-color 0.1s;
+    flex-shrink: 0;
+  }
+  .color-swatch:hover { transform: scale(1.18); }
+  .color-swatch.selected {
+    border-color: #fff;
+    transform: scale(1.18);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.3);
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── DATE PICKER ── */
+  .date-input-wrap {
+    position: relative;
+    display: flex;
+    gap: 0;
+  }
+  .date-input-wrap input {
+    flex: 1;
+    border-radius: 4px 0 0 4px !important;
+    cursor: pointer;
+  }
+  .cal-trigger {
+    flex-shrink: 0;
+    width: 36px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: none;
+    border-radius: 0 4px 4px 0;
+    color: var(--muted);
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    padding: 0;
+  }
+  .cal-trigger:hover { background: #1e1e30; color: var(--accent); }
+
+  .cal-popup {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 500;
+    background: #12121e;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.7);
+    padding: 12px;
+    width: 256px;
+    user-select: none;
+  }
+  .cal-popup.open { display: block; }
+
+  .cal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .cal-nav button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 4px;
+    width: 28px; height: 28px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .cal-nav button:hover { color: var(--accent); border-color: var(--accent); }
+  .cal-month-label {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: var(--text);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+  .cal-dow {
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: center;
+    padding-bottom: 6px;
+  }
+  .cal-day {
+    aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text);
+    transition: background 0.1s, color 0.1s;
+  }
+  .cal-day:hover { background: #1e1e30; color: var(--accent); }
+  .cal-day.other-month { color: #44445a; }
+  .cal-day.today { color: var(--accent2); font-weight: 700; }
+  .cal-day.selected { background: var(--accent); color: #0a0a0f; font-weight: 700; }
+  .cal-day.selected:hover { background: #d4eb5a; }
+  .cal-day.empty { pointer-events: none; }
+  /* ── LOCATION AUTOCOMPLETE ── */
+  .loc-wrap {
+    position: relative;
+  }
+  .loc-suggestions {
+    display: none;
+    position: absolute;
+    top: calc(100% + 3px);
+    left: 0; right: 0;
+    background: #12121e;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.6);
+    z-index: 501;
+    overflow: hidden;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .loc-suggestions.open { display: block; }
+  .loc-suggestion {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.1s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .loc-suggestion:hover,
+  .loc-suggestion.active { background: #1e1e30; color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR WRAP -->
+<div id="topbar-wrap">
+  <!-- Row 1: Brand + Settings + Clock -->
+  <div id="topbar-row1">
+    <span id="topbar-title">⬤ Timeline</span>
+    <div id="settings-wrap">
+      <button class="btn icon" onclick="toggleSettings(event)" title="Settings">⚙</button>
+      <div id="settings-menu">
+        <button class="menu-item" onclick="exportEvents();closeSettings()">⬇ Export Events</button>
+        <button class="menu-item" onclick="document.getElementById('import-input').click();closeSettings()">⬆ Import Events</button>
+        <div class="menu-sep"></div>
+        <button class="menu-item danger" onclick="clearAll();closeSettings()">✕ Clear All Events</button>
+      </div>
+    </div>
+    <input type="file" id="import-input" accept=".json" onchange="importEvents(event)">
+    <div id="clock">--:--:--</div>
+  </div>
+  <!-- Row 2: Actions + Zoom + Day nav -->
+  <div id="topbar-row2">
+    <button class="btn primary" onclick="openModal()">+ Add Event</button>
+    <button class="btn" onclick="openList()">☰ List Events</button>
+    <button class="btn" id="tasks-btn" onclick="toggleTasks()">✓ Tasks</button>
+    <div class="topbar-sep"></div>
+    <button class="btn icon" onclick="zoomIn()" title="Zoom in">＋</button>
+    <button class="btn icon" onclick="zoomOut()" title="Zoom out">－</button>
+    <div class="topbar-sep"></div>
+    <button class="btn icon" onclick="jumpDays(-1)" title="Previous day">◀</button>
+    <button class="btn icon" onclick="jumpDays(1)" title="Next day">▶</button>
+  </div>
+  <!-- Tasks panel (inline, pushes viewport down) -->
+  <div id="tasks-panel">
+    <div id="tasks-header">✓ Tasks</div>
+    <div id="tasks-list"></div>
+    <div id="task-add-row">
+      <input type="text" id="task-input" placeholder="Add a task…">
+      <button class="btn primary" onclick="addTask()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- TIMELINE -->
+<div id="viewport">
+  <div id="day-banner"></div>
+  <div id="track">
+    <div id="now-line"><span id="now-label">NOW</span></div>
+  </div>
+  <div id="empty">
+    <p>No events yet</p>
+    <p style="color:#33334a">Click "+ Add Event" to get started</p>
+  </div>
+  <button id="back-to-now" onclick="backToNow()">↩ Back to Now</button>
+</div>
+
+<!-- LIST MODAL -->
+<div id="list-overlay">
+  <div id="list-modal">
+    <div id="list-header">
+      <h2 id="list-title">Events</h2>
+      <button class="tab-btn active" id="tab-future" onclick="setListTab('future')">Future</button>
+      <button class="tab-btn" id="tab-past" onclick="setListTab('past')">Past</button>
+      <button class="btn" style="margin-left:6px" onclick="closeList()">Close</button>
+    </div>
+    <div id="list-body"></div>
+  </div>
+</div>
+<div id="modal-overlay">
+  <div id="modal">
+    <h2 id="modal-title">Add Event</h2>
+    <div class="field">
+      <label>Event Name</label>
+      <input type="text" id="f-name" placeholder="e.g. Team standup">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Date</label>
+        <div class="date-input-wrap">
+          <input type="text" id="f-date" placeholder="DD/MM/YYYY" autocomplete="off">
+          <button type="button" class="cal-trigger" onclick="toggleCal()" title="Pick date">&#128197;</button>
+        </div>
+        <div id="cal-popup" class="cal-popup"></div>
+      </div>
+      <div class="field">
+        <label>Time</label>
+        <input type="time" id="f-time">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Duration (minutes)</label>
+        <input type="number" id="f-duration" placeholder="60" min="1">
+      </div>
+      <div class="field">
+        <label>Location</label>
+        <div class="loc-wrap">
+          <input type="text" id="f-location" placeholder="e.g. Room 4B" autocomplete="off">
+          <div id="loc-suggestions" class="loc-suggestions"></div>
+        </div>
+      </div>
+    </div>
+    <div class="color-field">
+      <label>Colour</label>
+      <div class="color-swatches" id="color-swatches"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="saveEvent()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────
+let PIXELS_PER_MINUTE = 3;
+const PPM_BASE              = 1.5;
+const ZOOM_LEVELS           = [1, 1.5, 2, 3, 4, 6, 8, 12];
+let   zoomIdx               = 2;   // default index → PPM = 1.5*2 = 3
+const TICK_INTERVAL_MIN     = 15;
+const VISIBLE_WINDOW_BEFORE = 60 * 24;
+const VISIBLE_WINDOW_AFTER  = 60 * 24;
+const NOW_TOP_PX   = 80;
+const SNAP_MINUTES = 5;
+
+// ── SCROLL / VIEW STATE ──────────────────────────────────
+let scrollOffsetPx = 0;
+let isScrollLocked = false;
+let viewDayOffset  = 0;   // 0=today, +1=tomorrow, -1=yesterday
+
+// ── DRAG STATE ───────────────────────────────────────────
+let dragState = null;
+
+// ── FLASH TRACKING ───────────────────────────────────────
+const flashedIds = new Set(); // event IDs that have already flashed
+
+// Pastel-ish rainbow palette — dark enough for white text (all ~40-55% lightness)
+const EVENT_COLOURS = [
+  { id: 'none',   hex: null,      label: 'Default' },
+  { id: 'red',    hex: '#b84a4a', label: 'Red'     },
+  { id: 'coral',  hex: '#b85e3a', label: 'Coral'   },
+  { id: 'amber',  hex: '#9e7230', label: 'Amber'   },
+  { id: 'yellow', hex: '#8a8230', label: 'Yellow'  },
+  { id: 'lime',   hex: '#527a38', label: 'Lime'    },
+  { id: 'green',  hex: '#3a7a56', label: 'Green'   },
+  { id: 'teal',   hex: '#2e7a78', label: 'Teal'    },
+  { id: 'cyan',   hex: '#2e6e8a', label: 'Cyan'    },
+  { id: 'blue',   hex: '#3a5c9e', label: 'Blue'    },
+  { id: 'indigo', hex: '#4e4a9e', label: 'Indigo'  },
+  { id: 'violet', hex: '#6e409e', label: 'Violet'  },
+  { id: 'pink',   hex: '#9e3a7a', label: 'Pink'    },
+];
+
+let selectedColour = 'none';
+
+function initColourSwatches() {
+  const wrap = document.getElementById('color-swatches');
+  EVENT_COLOURS.forEach(c => {
+    const sw = document.createElement('div');
+    sw.className = 'color-swatch' + (c.id === 'none' ? ' selected' : '');
+    sw.dataset.id = c.id;
+    sw.title = c.label;
+    if (c.hex) {
+      sw.style.background = c.hex;
+    } else {
+      // "Default" swatch — show the card default colour with accent border
+      sw.style.background = '#14141e';
+      sw.style.border = '2px solid #2a2a3e';
+      sw.innerHTML = '<span style="font-size:0.6rem;color:#8888aa;display:flex;align-items:center;justify-content:center;height:100%">–</span>';
+    }
+    sw.addEventListener('click', () => {
+      selectedColour = c.id;
+      wrap.querySelectorAll('.color-swatch').forEach(el => el.classList.remove('selected'));
+      sw.classList.add('selected');
+    });
+    wrap.appendChild(sw);
+  });
+}
+
+// ── STATE ────────────────────────────────────────────────
+let events = [];
+let editingId = null;
+let animFrame = null;
+
+// ── STORAGE ──────────────────────────────────────────────
+// In the EXE (pywebview), window.pywebview.api exposes readData/writeData.
+// pywebview injects the api asynchronously, so we wait for 'pywebviewready'.
+// In the browser we fall back to localStorage.
+
+let pywebviewReady = false;
+window.addEventListener('pywebviewready', () => { pywebviewReady = true; });
+
+function isApp() {
+  return pywebviewReady && typeof window.pywebview !== 'undefined' && window.pywebview.api;
+}
+
+async function save() {
+  const payload = { events, locations: loadLocHistory() };
+  if (isApp()) {
+    try { await window.pywebview.api.writeData(JSON.stringify(payload)); } catch(e) {}
+  } else {
+    try { localStorage.setItem('timeline_events', JSON.stringify(events)); } catch(e) {}
+  }
+}
+
+async function load() {
+  if (isApp()) {
+    try {
+      const raw = await window.pywebview.api.readData();
+      if (raw) {
+        const d = JSON.parse(raw);
+        events = d.events || [];
+        if (d.locations) saveLocHistory(d.locations);
+      }
+    } catch(e) { events = []; }
+  } else {
+    try {
+      const d = localStorage.getItem('timeline_events');
+      if (d) events = JSON.parse(d);
+    } catch(e) { events = []; }
+  }
+}
+
+// ── CLOCK ─────────────────────────────────────────────────
+function formatTime(d) {
+  return d.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function formatDate(d) {
+  return d.toLocaleDateString('en-GB', {weekday:'short',day:'numeric',month:'short',year:'numeric'});
+}
+
+// ── MODAL ─────────────────────────────────────────────────
+// Date is stored internally as YYYY-MM-DD but displayed/picked as DD/MM/YYYY
+function isoToDisplay(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+function displayToIso(display) {
+  if (!display) return '';
+  const [d, m, y] = display.split('/');
+  return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+}
+
+// ── LAST-USED DEFAULTS ───────────────────────────────────
+let lastUsedDate     = null;  // ISO YYYY-MM-DD
+let lastUsedTime     = null;  // HH:MM
+let lastUsedDuration = null;  // number (minutes)
+
+function openModal(id) {
+  editingId = id || null;
+  const mo = document.getElementById('modal-overlay');
+  document.getElementById('modal-title').textContent = id ? 'Edit Event' : 'Add Event';
+  closeCal();
+  if (id) {
+    const ev = events.find(e => e.id === id);
+    document.getElementById('f-name').value = ev.name;
+    document.getElementById('f-date').value = isoToDisplay(ev.date);
+    calSelectedIso = ev.date;
+    document.getElementById('f-time').value = ev.time;
+    document.getElementById('f-duration').value = ev.duration;
+    document.getElementById('f-location').value = ev.location || '';
+    setSwatchSelection(ev.color || 'none');
+  } else {
+    const nowRaw = new Date();
+    const snapMs = SNAP_MINUTES * 60000;
+
+    // Use last-used date/time if available, otherwise snap to next 5-min
+    let defaultDate, defaultTime, defaultDuration;
+    if (lastUsedDate && lastUsedTime) {
+      defaultDate     = lastUsedDate;
+      defaultTime     = lastUsedTime;
+      defaultDuration = lastUsedDuration || 60;
+    } else {
+      const snapped   = new Date(Math.ceil(nowRaw.getTime() / snapMs) * snapMs);
+      defaultDate     = snapped.toISOString().slice(0, 10);
+      defaultTime     = snapped.toTimeString().slice(0, 5);
+      defaultDuration = 60;
+    }
+
+    document.getElementById('f-name').value     = '';
+    document.getElementById('f-date').value     = isoToDisplay(defaultDate);
+    calSelectedIso                               = defaultDate;
+    document.getElementById('f-time').value     = defaultTime;
+    document.getElementById('f-duration').value = defaultDuration;
+    document.getElementById('f-location').value = '';
+    setSwatchSelection('none');
+  }
+  mo.classList.add('open');
+  document.getElementById('f-name').focus();
+}
+
+function setSwatchSelection(colorId) {
+  selectedColour = colorId;
+  const wrap = document.getElementById('color-swatches');
+  wrap.querySelectorAll('.color-swatch').forEach(el => {
+    el.classList.toggle('selected', el.dataset.id === colorId);
+  });
+}
+function closeModal() {
+  closeCal();
+  document.getElementById('modal-overlay').classList.remove('open');
+  editingId = null;
+}
+
+// Only close the modal when BOTH mousedown AND mouseup land on the backdrop —
+// dragging text inside the modal and releasing outside must not dismiss it.
+let overlayMousedownOnBackdrop = false;
+document.getElementById('modal-overlay').addEventListener('mousedown', e => {
+  overlayMousedownOnBackdrop = (e.target === e.currentTarget);
+});
+document.getElementById('modal-overlay').addEventListener('mouseup', e => {
+  if (overlayMousedownOnBackdrop && e.target === e.currentTarget) closeModal();
+  overlayMousedownOnBackdrop = false;
+});
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCal(); closeModal(); } });
+
+// ── LOCATION AUTOCOMPLETE ─────────────────────────────────
+function loadLocHistory() {
+  try { return JSON.parse(localStorage.getItem('timeline_locations') || '[]'); }
+  catch { return []; }
+}
+function saveLocHistory(locs) {
+  try { localStorage.setItem('timeline_locations', JSON.stringify(locs)); } catch {}
+}
+function recordLocation(loc) {
+  if (!loc) return;
+  let locs = loadLocHistory();
+  locs = [loc, ...locs.filter(l => l.toLowerCase() !== loc.toLowerCase())].slice(0, 50);
+  saveLocHistory(locs);
+}
+
+let locActiveIdx = -1;
+
+function initLocAutocomplete() {
+  const input = document.getElementById('f-location');
+  const box   = document.getElementById('loc-suggestions');
+
+  input.addEventListener('input', () => {
+    locActiveIdx = -1;
+    const q = input.value.trim().toLowerCase();
+    const all = loadLocHistory();
+    const matches = q
+      ? all.filter(l => l.toLowerCase().includes(q))
+      : all;
+    renderLocSuggestions(matches, input, box);
+  });
+
+  input.addEventListener('keydown', e => {
+    const items = box.querySelectorAll('.loc-suggestion');
+    if (!box.classList.contains('open') || !items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      locActiveIdx = Math.min(locActiveIdx + 1, items.length - 1);
+      updateLocActive(items);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      locActiveIdx = Math.max(locActiveIdx - 1, -1);
+      updateLocActive(items);
+    } else if (e.key === 'Enter' && locActiveIdx >= 0) {
+      e.preventDefault();
+      input.value = items[locActiveIdx].textContent;
+      closeLocSuggestions(box);
+    } else if (e.key === 'Escape') {
+      closeLocSuggestions(box);
+    }
+  });
+
+  // Show all past locations on focus if input is empty
+  input.addEventListener('focus', () => {
+    locActiveIdx = -1;
+    const q = input.value.trim().toLowerCase();
+    const all = loadLocHistory();
+    const matches = q ? all.filter(l => l.toLowerCase().includes(q)) : all;
+    if (matches.length) renderLocSuggestions(matches, input, box);
+  });
+
+  document.addEventListener('mousedown', e => {
+    if (!box.contains(e.target) && e.target !== input) closeLocSuggestions(box);
+  });
+}
+
+function renderLocSuggestions(matches, input, box) {
+  if (!matches.length) { closeLocSuggestions(box); return; }
+  box.innerHTML = matches.map((l, i) =>
+    `<div class="loc-suggestion" data-idx="${i}">${escHtml(l)}</div>`
+  ).join('');
+  box.querySelectorAll('.loc-suggestion').forEach(el => {
+    el.addEventListener('mousedown', e => {
+      e.preventDefault();
+      input.value = el.textContent;
+      closeLocSuggestions(box);
+    });
+  });
+  box.classList.add('open');
+}
+function updateLocActive(items) {
+  items.forEach((el, i) => el.classList.toggle('active', i === locActiveIdx));
+  if (locActiveIdx >= 0) items[locActiveIdx].scrollIntoView({ block: 'nearest' });
+}
+function closeLocSuggestions(box) {
+  box.classList.remove('open');
+  box.innerHTML = '';
+  locActiveIdx = -1;
+}
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function saveEvent() {
+  const name = document.getElementById('f-name').value.trim();
+  const date = displayToIso(document.getElementById('f-date').value.trim());
+  const time = document.getElementById('f-time').value;
+  const duration = parseInt(document.getElementById('f-duration').value) || 60;
+  const location = document.getElementById('f-location').value.trim();
+  const color = selectedColour || 'none';
+  if (!name || !date || !time) { alert('Please fill in name, date and time.'); return; }
+  if (location) recordLocation(location);
+  if (editingId) {
+    const ev = events.find(e => e.id === editingId);
+    Object.assign(ev, { name, date, time, duration, location, color });
+  } else {
+    events.push({ id: Date.now().toString(), name, date, time, duration, location, color });
+  }
+  // Remember for next new event
+  lastUsedDate     = date;
+  lastUsedTime     = time;
+  lastUsedDuration = duration;
+  save();
+  closeModal();
+}
+
+// ── CALENDAR PICKER ──────────────────────────────────────
+let calSelectedIso = '';   // YYYY-MM-DD
+let calViewYear  = new Date().getFullYear();
+let calViewMonth = new Date().getMonth(); // 0-based
+
+const MONTHS = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+const DOWS   = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+
+function toggleCal() {
+  const popup = document.getElementById('cal-popup');
+  if (popup.classList.contains('open')) { closeCal(); return; }
+  // Seed view from currently selected date
+  if (calSelectedIso) {
+    const d = new Date(calSelectedIso + 'T00:00:00');
+    calViewYear  = d.getFullYear();
+    calViewMonth = d.getMonth();
+  }
+  renderCal();
+  popup.classList.add('open');
+}
+function closeCal() {
+  document.getElementById('cal-popup').classList.remove('open');
+}
+
+function calNav(delta) {
+  calViewMonth += delta;
+  if (calViewMonth < 0)  { calViewMonth = 11; calViewYear--; }
+  if (calViewMonth > 11) { calViewMonth = 0;  calViewYear++; }
+  renderCal();
+}
+
+function calPick(iso) {
+  calSelectedIso = iso;
+  document.getElementById('f-date').value = isoToDisplay(iso);
+  closeCal();
+}
+
+function renderCal() {
+  const popup = document.getElementById('cal-popup');
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  const firstDay = new Date(calViewYear, calViewMonth, 1);
+  // Monday-first: getDay() returns 0=Sun,1=Mon…6=Sat → offset to Mon=0
+  const startOffset = (firstDay.getDay() + 6) % 7;
+  const daysInMonth = new Date(calViewYear, calViewMonth + 1, 0).getDate();
+  const daysInPrev  = new Date(calViewYear, calViewMonth, 0).getDate();
+
+  let html = `
+    <div class="cal-nav">
+      <button onclick="calNav(-1)">&#8249;</button>
+      <span class="cal-month-label">${MONTHS[calViewMonth]} ${calViewYear}</span>
+      <button onclick="calNav(1)">&#8250;</button>
+    </div>
+    <div class="cal-grid">
+      ${DOWS.map(d => `<div class="cal-dow">${d}</div>`).join('')}`;
+
+  // Leading days from previous month
+  for (let i = 0; i < startOffset; i++) {
+    const day = daysInPrev - startOffset + 1 + i;
+    const iso = `${calViewYear}-${String(calViewMonth).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    html += `<div class="cal-day other-month" onclick="calPick('${iso}')">${day}</div>`;
+  }
+
+  // Days of current month
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${calViewYear}-${String(calViewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const date = new Date(calViewYear, calViewMonth, d);
+    let cls = 'cal-day';
+    if (date.getTime() === today.getTime()) cls += ' today';
+    if (iso === calSelectedIso) cls += ' selected';
+    html += `<div class="${cls}" onclick="calPick('${iso}')">${d}</div>`;
+  }
+
+  // Trailing days to fill grid
+  const total = startOffset + daysInMonth;
+  const trailing = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let d = 1; d <= trailing; d++) {
+    const nextMonth = calViewMonth + 2 > 12 ? 1 : calViewMonth + 2;
+    const nextYear  = calViewMonth + 1 > 11 ? calViewYear + 1 : calViewYear;
+    const iso = `${nextYear}-${String(nextMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    html += `<div class="cal-day other-month" onclick="calPick('${iso}')">${d}</div>`;
+  }
+
+  html += `</div>`;
+  popup.innerHTML = html;
+}
+
+// Close calendar when clicking outside
+document.addEventListener('mousedown', e => {
+  const popup = document.getElementById('cal-popup');
+  if (!popup.classList.contains('open')) return;
+  if (!popup.contains(e.target) && !e.target.closest('.cal-trigger')) closeCal();
+});
+
+function deleteEvent(id) {
+  events = events.filter(e => e.id !== id);
+  save();
+  if (document.getElementById('list-overlay').classList.contains('open')) renderList();
+}
+
+function clearAll() {
+  if (!events.length || confirm('Delete all events?')) {
+    events = [];
+    save();
+    if (document.getElementById('list-overlay').classList.contains('open')) renderList();
+  }
+}
+
+// ── LIST MODAL ────────────────────────────────────────────
+let listTab = 'future'; // 'future' | 'past'
+
+function openList() {
+  listTab = 'future';
+  document.getElementById('tab-future').classList.add('active');
+  document.getElementById('tab-past').classList.remove('active');
+  renderList();
+  document.getElementById('list-overlay').classList.add('open');
+}
+function closeList() {
+  document.getElementById('list-overlay').classList.remove('open');
+}
+function setListTab(tab) {
+  listTab = tab;
+  document.getElementById('tab-future').classList.toggle('active', tab === 'future');
+  document.getElementById('tab-past').classList.toggle('active', tab === 'past');
+  renderList();
+}
+
+function renderList() {
+  const now = new Date();
+  const body = document.getElementById('list-body');
+
+  // Sort all events by start time
+  const sorted = [...events]
+    .map(ev => ({ ev, start: getEventDate(ev), end: new Date(getEventDate(ev).getTime() + ev.duration * 60000) }))
+    .sort((a, b) => a.start - b.start);
+
+  const filtered = sorted.filter(({ start, end }) =>
+    listTab === 'future' ? end > now : end <= now
+  );
+  if (listTab === 'past') filtered.reverse(); // most recent past first
+
+  body.innerHTML = '';
+
+  if (!filtered.length) {
+    body.innerHTML = `<div class="list-empty">No ${listTab} events</div>`;
+    return;
+  }
+
+  // Group by date
+  const groups = {};
+  filtered.forEach(item => {
+    const key = item.start.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(item);
+  });
+
+  Object.entries(groups).forEach(([dateLabel, items]) => {
+    const group = document.createElement('div');
+    group.className = 'list-date-group';
+
+    const heading = document.createElement('div');
+    heading.className = 'list-date-heading';
+    heading.textContent = dateLabel;
+    group.appendChild(heading);
+
+    items.forEach(({ ev, start, end }) => {
+      const row = document.createElement('div');
+      row.className = 'list-row';
+      const isPast = now >= end;
+      const isOngoing = !isPast && now >= start;
+      if (isPast) row.classList.add('past');
+      if (isOngoing) row.classList.add('ongoing');
+
+      const timeStr = start.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})
+        + ' – ' + end.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+
+      const timeEl = document.createElement('div');
+      timeEl.className = 'list-row-time';
+      timeEl.textContent = timeStr;
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'list-row-name';
+      nameEl.textContent = ev.name;
+
+      const locEl = document.createElement('div');
+      locEl.className = 'list-row-loc';
+      locEl.textContent = ev.location || '';
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'list-row-del';
+      delBtn.textContent = '✕';
+      delBtn.title = 'Delete event';
+      delBtn.addEventListener('mousedown', e => {
+        e.stopPropagation();
+        e.preventDefault();
+        deleteEvent(ev.id);
+      });
+
+      row.appendChild(timeEl);
+      row.appendChild(nameEl);
+      if (ev.location) row.appendChild(locEl);
+      row.appendChild(delBtn);
+      row.addEventListener('click', e => {
+        if (!e.target.closest('.list-row-del')) { closeList(); openModal(ev.id); }
+      });
+      group.appendChild(row);
+    });
+
+    body.appendChild(group);
+  });
+}
+
+document.getElementById('list-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeList();
+});
+
+// ── SETTINGS MENU ────────────────────────────────────────
+function toggleSettings(e) {
+  e.stopPropagation();
+  document.getElementById('settings-menu').classList.toggle('open');
+}
+function closeSettings() {
+  document.getElementById('settings-menu').classList.remove('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#settings-wrap')) closeSettings();
+});
+
+// ── TASKS ────────────────────────────────────────────────
+let tasks = [];
+
+function saveTasks() {
+  try { localStorage.setItem('timeline_tasks', JSON.stringify(tasks)); } catch(e) {}
+}
+function loadTasks() {
+  try { const d = localStorage.getItem('timeline_tasks'); if (d) tasks = JSON.parse(d); } catch(e) {}
+}
+
+function toggleTasks() {
+  const panel = document.getElementById('tasks-panel');
+  const btn   = document.getElementById('tasks-btn');
+  panel.classList.toggle('open');
+  btn.classList.toggle('active', panel.classList.contains('open'));
+  if (panel.classList.contains('open')) renderTasks();
+}
+
+function renderTasks() {
+  const list = document.getElementById('tasks-list');
+  list.innerHTML = '';
+  if (!tasks.length) {
+    list.innerHTML = '<div class="tasks-empty">No tasks</div>';
+    return;
+  }
+  tasks.forEach((t, i) => {
+    const row = document.createElement('div');
+    row.className = 'task-row';
+    row.innerHTML = `<div class="task-check"></div><div class="task-text">${escHtml(t)}</div>`;
+    row.addEventListener('click', () => completeTask(i));
+    list.appendChild(row);
+  });
+}
+
+function addTask() {
+  const inp = document.getElementById('task-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  tasks.push(text);
+  saveTasks();
+  inp.value = '';
+  renderTasks();
+}
+
+function completeTask(idx) {
+  const row = document.getElementById('tasks-list').children[idx];
+  if (!row) return;
+  // Animate out then remove
+  row.style.opacity = '0';
+  row.style.transform = 'translateX(20px)';
+  row.style.transition = 'opacity 0.3s, transform 0.3s';
+  setTimeout(() => {
+    tasks.splice(idx, 1);
+    saveTasks();
+    renderTasks();
+  }, 300);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement === document.getElementById('task-input')) {
+    addTask();
+  }
+});
+
+// ── ZOOM ─────────────────────────────────────────────────
+function applyZoom() {
+  PIXELS_PER_MINUTE = PPM_BASE * ZOOM_LEVELS[zoomIdx];
+  lastEventsSig = '';
+}
+function zoomIn()  { if (zoomIdx < ZOOM_LEVELS.length - 1) { zoomIdx++; applyZoom(); } }
+function zoomOut() { if (zoomIdx > 0) { zoomIdx--; applyZoom(); } }
+
+document.getElementById('viewport').addEventListener('wheel', e => {
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+    if (e.deltaY < 0) zoomIn(); else zoomOut();
+  } else {
+    e.preventDefault();
+    scrollOffsetPx -= e.deltaY;
+    const maxOff = VISIBLE_WINDOW_BEFORE * PIXELS_PER_MINUTE - NOW_TOP_PX;
+    scrollOffsetPx = Math.max(-VISIBLE_WINDOW_AFTER * PIXELS_PER_MINUTE + 200,
+                     Math.min(maxOff, scrollOffsetPx));
+    isScrollLocked = Math.abs(scrollOffsetPx) > 2 || viewDayOffset !== 0;
+    document.getElementById('back-to-now').classList.toggle('visible', isScrollLocked);
+    lastEventsSig = '';
+  }
+}, { passive: false });
+
+// ── DAY NAVIGATION ───────────────────────────────────────
+function getViewDate() {
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate() + viewDayOffset);
+  return d;
+}
+
+function jumpDays(dir) {
+  viewDayOffset += dir;
+  isScrollLocked = viewDayOffset !== 0;
+  document.getElementById('back-to-now').classList.toggle('visible', isScrollLocked);
+  lastEventsSig = '';
+}
+
+function backToNow() {
+  viewDayOffset   = 0;
+  scrollOffsetPx  = 0;
+  isScrollLocked  = false;
+  document.getElementById('back-to-now').classList.remove('visible');
+  lastEventsSig   = '';
+}
+
+// ── DOUBLE-CLICK TO CREATE EVENT ─────────────────────────
+document.getElementById('viewport').addEventListener('dblclick', e => {
+  // Ignore if clicking on a card, handle, button, or overlay
+  if (e.target.closest('.event-card') ||
+      e.target.closest('.card-handle') ||
+      e.target.closest('#back-to-now')) return;
+
+  // Prevent the browser selecting the "NOW" label text on double-click
+  window.getSelection()?.removeAllRanges();
+
+  const now     = new Date();
+  const nowOff  = VISIBLE_WINDOW_BEFORE * PIXELS_PER_MINUTE;
+
+  // Recompute effectiveScrollPx the same way render() does
+  let effScroll = scrollOffsetPx;
+  if (viewDayOffset !== 0) {
+    const viewDay = new Date(now);
+    viewDay.setHours(0, 0, 0, 0);
+    viewDay.setDate(viewDay.getDate() + viewDayOffset);
+    const msToMidnight = viewDay.getTime() - now.getTime();
+    effScroll = -(msToMidnight / 60000) * PIXELS_PER_MINUTE + scrollOffsetPx;
+  }
+
+  const trackTop    = NOW_TOP_PX - nowOff + effScroll;
+  const trackY      = e.clientY - document.getElementById('viewport').getBoundingClientRect().top - trackTop;
+  const minsFromNow = (trackY - nowOff) / PIXELS_PER_MINUTE;
+
+  // Snap DOWN to nearest 15-min increment (tick above the cursor)
+  const DBLCLICK_SNAP = 15;
+  const clickedMs   = now.getTime() + minsFromNow * 60000;
+  const snappedMs   = Math.floor(clickedMs / (DBLCLICK_SNAP * 60000)) * (DBLCLICK_SNAP * 60000);
+  const snappedDate = new Date(snappedMs);
+
+  // Pre-fill and open modal
+  openModal();
+  const isoDate = snappedDate.toISOString().slice(0, 10);
+  document.getElementById('f-date').value = isoToDisplay(isoDate);
+  calSelectedIso = isoDate;
+  document.getElementById('f-time').value = snappedDate.toTimeString().slice(0, 5);
+  lastUsedDate = isoDate;
+  lastUsedTime = snappedDate.toTimeString().slice(0, 5);
+});
+
+// ── DRAG: resize / move cards ────────────────────────────
+function snapToFive(ms) {
+  const snapMs = SNAP_MINUTES * 60000;
+  return Math.round(ms / snapMs) * snapMs;
+}
+
+function pxToMs(px) { return (px / PIXELS_PER_MINUTE) * 60000; }
+
+function startDrag(e, evId, type) {
+  e.preventDefault();
+  e.stopPropagation();
+  const ev = events.find(v => v.id === evId);
+  if (!ev) return;
+  const startDate = getEventDate(ev);
+  dragState = {
+    type,
+    evId,
+    startY:          e.clientY,
+    origStartMs:     startDate.getTime(),
+    origDurationMin: ev.duration,
+  };
+  document.body.style.userSelect = 'none';
+  document.getElementById('track')
+    .querySelector(`.event-card[data-id="${evId}"]`)
+    ?.classList.add('dragging');
+}
+
+document.addEventListener('mousemove', e => {
+  if (!dragState) return;
+  const dy    = e.clientY - dragState.startY;
+  const dMs   = pxToMs(dy);
+  const ev    = events.find(v => v.id === dragState.evId);
+  if (!ev) return;
+
+  if (dragState.type === 'move') {
+    const newStartMs = snapToFive(dragState.origStartMs + dMs);
+    const d = new Date(newStartMs);
+    ev.date = d.toISOString().slice(0, 10);
+    ev.time = d.toTimeString().slice(0, 5);
+
+  } else if (dragState.type === 'top') {
+    // Dragging top handle: shift start, keep end fixed
+    const origEndMs = dragState.origStartMs + dragState.origDurationMin * 60000;
+    let newStartMs  = snapToFive(dragState.origStartMs + dMs);
+    // Don't allow start to pass end (minimum 5 min)
+    newStartMs = Math.min(newStartMs, origEndMs - 5 * 60000);
+    const newDurMin = Math.round((origEndMs - newStartMs) / 60000);
+    const d = new Date(newStartMs);
+    ev.date     = d.toISOString().slice(0, 10);
+    ev.time     = d.toTimeString().slice(0, 5);
+    ev.duration = newDurMin;
+
+  } else if (dragState.type === 'bottom') {
+    // Dragging bottom handle: keep start fixed, change duration
+    const newDurMin = Math.max(5, Math.round(
+      (dragState.origDurationMin * 60000 + dMs) / 60000 / SNAP_MINUTES
+    ) * SNAP_MINUTES);
+    ev.duration = newDurMin;
+  }
+
+  lastEventsSig = ''; // trigger rebuild
+});
+
+document.addEventListener('mouseup', () => {
+  if (!dragState) return;
+  const card = document.getElementById('track')
+    .querySelector(`.event-card[data-id="${dragState.evId}"]`);
+  card?.classList.remove('dragging');
+  save();
+  dragState = null;
+  document.body.style.userSelect = '';
+});
+
+// ── IMPORT / EXPORT ───────────────────────────────────────
+function exportEvents() {
+  const blob = new Blob([JSON.stringify(events, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'timeline-events.json';
+  a.click();
+}
+function importEvents(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const r = new FileReader();
+  r.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (Array.isArray(data)) {
+        events = data;
+        save();
+      } else { alert('Invalid file format.'); }
+    } catch { alert('Could not parse JSON file.'); }
+    ev.target.value = '';
+  };
+  r.readAsText(file);
+}
+
+// ── RENDERING ─────────────────────────────────────────────
+function minutesBetween(a, b) { return (b - a) / 60000; }
+function getEventDate(ev) { return new Date(ev.date + 'T' + ev.time); }
+
+// Track a signature of the events array so we only rebuild DOM when needed
+let lastEventsSig = '';
+let lastViewportWidth = 0;
+
+// Compute column layout using a proper clique-based algorithm.
+// 1. Build overlap groups (connected components of the overlap graph).
+// 2. Within each group, find the maximum simultaneous overlap (clique size)
+//    using a sweep over start/end events.
+// 3. Assign each event a stable column slot using earliest-free-column,
+//    and size all columns equally to the group's max clique width.
+function computeLayout(events, windowStart, windowEnd, trackAvailWidth) {
+  const TRACK_LEFT = 80;
+  const visible = events
+    .map(ev => {
+      const start = getEventDate(ev);
+      const end = new Date(start.getTime() + ev.duration * 60000);
+      return { ev, start, end };
+    })
+    .filter(({ start, end }) => end > windowStart && start < windowEnd);
+
+  if (!visible.length) return [];
+  visible.sort((a, b) => a.start - b.start || a.end - b.end);
+
+  // ── Step 1: find connected components (overlap groups) ──
+  const n = visible.length;
+  const overlaps = (a, b) => a.start < b.end && b.start < a.end;
+
+  // Union-Find
+  const parent = visible.map((_, i) => i);
+  function find(x) { return parent[x] === x ? x : (parent[x] = find(parent[x])); }
+  function union(x, y) { parent[find(x)] = find(y); }
+  for (let i = 0; i < n; i++)
+    for (let j = i + 1; j < n; j++)
+      if (overlaps(visible[i], visible[j])) union(i, j);
+
+  // Group indices by root
+  const groups = {};
+  for (let i = 0; i < n; i++) {
+    const r = find(i);
+    if (!groups[r]) groups[r] = [];
+    groups[r].push(i);
+  }
+
+  const result = new Array(n);
+
+  Object.values(groups).forEach(indices => {
+    const items = indices.map(i => visible[i]);
+
+    // ── Step 2: max simultaneous overlap via sweep ──
+    const pts = [];
+    items.forEach(item => {
+      pts.push({ t: item.start.getTime(), d: +1 });
+      pts.push({ t: item.end.getTime(),   d: -1 });
+    });
+    pts.sort((a, b) => a.t - b.t || a.d - b.d); // ends before starts at same time
+    let cur = 0, maxClique = 0;
+    pts.forEach(p => { cur += p.d; maxClique = Math.max(maxClique, cur); });
+
+    // ── Step 3: assign columns (earliest free slot) ──
+    const colEnds = []; // colEnds[c] = end time of last event placed in column c
+    const colAssigned = items.map(({ start, end }) => {
+      let c = colEnds.findIndex(t => t <= start);
+      if (c === -1) c = colEnds.length;
+      colEnds[c] = end;
+      return c;
+    });
+
+    const colW = trackAvailWidth / maxClique;
+    items.forEach((item, k) => {
+      const globalIdx = indices[k];
+      result[globalIdx] = {
+        id:    item.ev.id,
+        ev:    item.ev,
+        start: item.start,
+        end:   item.end,
+        left:  TRACK_LEFT + colAssigned[k] * colW,
+        width: colW - 4,
+      };
+    });
+  });
+
+  return result;
+}
+
+// Build (or rebuild) the card DOM nodes from scratch
+function buildCards(layout, nowOffsetFromTrackTop) {
+  const track = document.getElementById('track');
+  track.querySelectorAll('.event-card').forEach(el => el.remove());
+
+  layout.forEach(({ ev, start, end, left, width }) => {
+    const heightPx = Math.max(ev.duration * PIXELS_PER_MINUTE, 28);
+    const colourDef = EVENT_COLOURS.find(c => c.id === (ev.color || 'none'));
+    const hex = colourDef?.hex || null;
+
+    const card = document.createElement('div');
+    card.className = 'event-card';
+    card.dataset.id = ev.id;
+    card.style.left   = left + 'px';
+    card.style.width  = width + 'px';
+    card.style.right  = 'auto';
+    card.style.height = heightPx + 'px';
+    card.style.overflow = 'hidden';
+
+    if (hex) {
+      card.style.borderLeftColor = hex;
+      card.style.background = hex + '22'; // ~13% opacity tint
+    }
+
+    const content = document.createElement('div');
+    content.className = 'card-content';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'event-name';
+    nameEl.textContent = ev.name;
+
+    const metaEl = document.createElement('div');
+    metaEl.className = 'event-meta';
+    const timeStr = start.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})
+      + ' → ' + end.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    metaEl.innerHTML = `<span>🕐 ${timeStr}</span><span>⏱ ${ev.duration}m</span>${ev.location ? `<span>📍 ${ev.location}</span>` : ''}`;
+
+    content.appendChild(nameEl);
+    content.appendChild(metaEl);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'event-delete';
+    delBtn.textContent = '✕';
+    delBtn.title = 'Delete event';
+    delBtn.addEventListener('mousedown', e => {
+      e.stopPropagation();
+      e.preventDefault();
+      deleteEvent(ev.id);
+    });
+
+    // ── Drag handles ──
+    const handleTop = document.createElement('div');
+    handleTop.className = 'card-handle top';
+    handleTop.addEventListener('mousedown', e => startDrag(e, ev.id, 'top'));
+
+    const handleBottom = document.createElement('div');
+    handleBottom.className = 'card-handle bottom';
+    handleBottom.addEventListener('mousedown', e => startDrag(e, ev.id, 'bottom'));
+
+    card.appendChild(handleTop);
+    card.appendChild(content);
+    card.appendChild(delBtn);
+    card.appendChild(handleBottom);
+    card.addEventListener('mousedown', e => {
+      if (e.target.closest('.event-delete') ||
+          e.target.closest('.card-handle.top') ||
+          e.target.closest('.card-handle.bottom')) return;
+      startDrag(e, ev.id, 'move');
+    });
+    card.addEventListener('click', e => {
+      if (!e.target.closest('.event-delete')) openModal(ev.id);
+    });
+    track.appendChild(card);
+  });
+}
+
+// Move existing card DOM nodes to their correct Y positions + update classes.
+// For ongoing events, translate the inner .card-content so the text stays
+// visible just inside the card's top edge, clamped to how far the card
+// top has scrolled above the now-line.
+function updateCardPositions(layout, nowOffsetFromTrackTop, now, effectiveScrollPx) {
+  const trackTopInViewport = NOW_TOP_PX - nowOffsetFromTrackTop + effectiveScrollPx;
+
+  layout.forEach(({ ev, start, end }) => {
+    const card = document.querySelector(`.event-card[data-id="${ev.id}"]`);
+    if (!card) return;
+
+    const minFromNow     = minutesBetween(now, start);
+    const cardTopInTrack = nowOffsetFromTrackTop + minFromNow * PIXELS_PER_MINUTE;
+    card.style.top = cardTopInTrack + 'px';
+
+    const isPast    = now >= end;
+    const isOngoing = !isPast && now >= start;
+    card.classList.toggle('past',    isPast);
+    card.classList.toggle('ongoing', isOngoing);
+
+    // Flash when event first becomes ongoing
+    if (isOngoing && !flashedIds.has(ev.id)) {
+      flashedIds.add(ev.id);
+      card.classList.add('flashing');
+      setTimeout(() => card.classList.remove('flashing'), 1500);
+    }
+
+    const content = card.querySelector('.card-content');
+    if (!content) return;
+
+    if (isOngoing) {
+      const cardTopInViewport = trackTopInViewport + cardTopInTrack;
+      const nowLineInViewport = NOW_TOP_PX;
+      const scrolledPast  = nowLineInViewport - cardTopInViewport;
+      const cardHeight    = parseFloat(card.style.height);
+      const contentH      = content.offsetHeight || 52;
+      const maxTranslate  = Math.max(0, cardHeight - contentH - 8);
+      const translate     = Math.max(0, Math.min(scrolledPast + 6, maxTranslate));
+      content.style.transform = `translateY(${translate}px)`;
+    } else {
+      content.style.transform = '';
+    }
+  });
+}
+
+// Rebuild ticks (these don't need hover stability so wiping them is fine)
+function rebuildTicks(track, now, nowOffsetFromTrackTop, windowStart, windowEnd) {
+  track.querySelectorAll('.tick').forEach(el => el.remove());
+  const tickMs = TICK_INTERVAL_MIN * 60000;
+  let t = new Date(Math.ceil(windowStart.getTime() / tickMs) * tickMs);
+  while (t <= windowEnd) {
+    const minFromNow = minutesBetween(now, t);
+    const yPx = nowOffsetFromTrackTop + minFromNow * PIXELS_PER_MINUTE;
+    const isHour = t.getMinutes() === 0;
+
+    const tick = document.createElement('div');
+    tick.className = 'tick' + (isHour ? ' hour' : '');
+    tick.style.top = yPx + 'px';
+
+    const label = document.createElement('span');
+    label.className = 'tick-label';
+    label.textContent = isHour
+      ? t.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})
+      : t.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+
+    const line = document.createElement('div');
+    line.className = 'tick-line';
+
+    tick.appendChild(label);
+    tick.appendChild(line);
+    track.appendChild(tick);
+    t = new Date(t.getTime() + tickMs);
+  }
+}
+
+let currentLayout = [];
+
+function render() {
+  const nowRaw = new Date();
+  document.getElementById('clock').textContent = formatDate(nowRaw) + '  ' + formatTime(nowRaw);
+
+  // Use real time unsnapped — tick labels are vertically centred on their
+  // line via CSS translateY, so no integer-minute snapping is needed.
+  const now = nowRaw;
+
+  const track    = document.getElementById('track');
+  const viewport = document.getElementById('viewport');
+
+  // ── Day-view mode vs live mode ──────────────────────────
+  // In day-view (viewDayOffset !== 0), the track shows exactly 00:00–24:00
+  // for the target day. The "anchor" point (nowOffsetFromTrackTop) is still
+  // relative to the real 'now', but we shift scrollOffsetPx so that midnight
+  // of the target day aligns near the top of the screen.
+
+  const nowOffsetFromTrackTop = VISIBLE_WINDOW_BEFORE * PIXELS_PER_MINUTE;
+  const totalPx = (VISIBLE_WINDOW_BEFORE + VISIBLE_WINDOW_AFTER) * PIXELS_PER_MINUTE;
+  track.style.height = totalPx + 'px';
+
+  let effectiveScrollPx = scrollOffsetPx;
+  if (viewDayOffset !== 0) {
+    // Compute how many px from 'now' to midnight of viewDay
+    const viewDay = new Date(now);
+    viewDay.setHours(0, 0, 0, 0);
+    viewDay.setDate(viewDay.getDate() + viewDayOffset);
+    const msToMidnight = viewDay.getTime() - now.getTime();
+    const pxToMidnight = (msToMidnight / 60000) * PIXELS_PER_MINUTE;
+    // We want midnight to appear near the top (at NOW_TOP_PX in viewport)
+    effectiveScrollPx = -pxToMidnight + scrollOffsetPx;
+  }
+
+  track.style.top = (NOW_TOP_PX - nowOffsetFromTrackTop + effectiveScrollPx) + 'px';
+
+  // ── Now-line ──────────────────────────────────────────
+  const nowLineEl = document.getElementById('now-line');
+  nowLineEl.style.top = nowOffsetFromTrackTop + 'px';
+  // The now-line sits at nowOffsetFromTrackTop inside the track.
+  // The track's CSS top = NOW_TOP_PX - nowOffsetFromTrackTop + effectiveScrollPx
+  // So the now-line's viewport Y = trackTop + nowOffsetFromTrackTop = NOW_TOP_PX + effectiveScrollPx - scrollOffsetPx
+  // In live mode: effectiveScrollPx = scrollOffsetPx, so nowLineY = NOW_TOP_PX ✓
+  // In day mode: effectiveScrollPx includes day shift, so it moves correctly.
+  const nowLineActualViewportY = NOW_TOP_PX + (effectiveScrollPx - scrollOffsetPx);
+  const nowLineVisible = nowLineActualViewportY >= -2 && nowLineActualViewportY <= viewport.clientHeight + 2;
+  nowLineEl.style.display = nowLineVisible ? '' : 'none';
+
+  // ── Day banner ─────────────────────────────────────────
+  const dayBanner = document.getElementById('day-banner');
+  if (viewDayOffset !== 0) {
+    const viewDay = new Date(now);
+    viewDay.setHours(12, 0, 0, 0);
+    viewDay.setDate(viewDay.getDate() + viewDayOffset);
+    dayBanner.textContent = viewDay.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+    dayBanner.classList.add('visible');
+  } else {
+    dayBanner.classList.remove('visible');
+  }
+
+  // ── Window for ticks and events ────────────────────────
+  // In day-view, extend the window to cover the full target day.
+  let windowStart, windowEnd;
+  if (viewDayOffset !== 0) {
+    const viewDay = new Date(now);
+    viewDay.setHours(0, 0, 0, 0);
+    viewDay.setDate(viewDay.getDate() + viewDayOffset);
+    windowStart = new Date(viewDay.getTime() - 2 * 60 * 60000);          // 2h before midnight
+    windowEnd   = new Date(viewDay.getTime() + 26 * 60 * 60000);         // 2h after midnight next day
+  } else {
+    windowStart = new Date(now.getTime() - VISIBLE_WINDOW_BEFORE * 60000);
+    windowEnd   = new Date(now.getTime() + VISIBLE_WINDOW_AFTER  * 60000);
+  }
+
+  // anchorTime: the moment that sits at nowOffsetFromTrackTop in the track.
+  // In live mode this is 'now'. In day-view it stays 'now' (the track is
+  // shifted via effectiveScrollPx to show the right day — no need to change
+  // the anchor, just the scroll offset).
+  const anchorTime = now;
+
+  rebuildTicks(track, anchorTime, nowOffsetFromTrackTop, windowStart, windowEnd);
+
+  const TRACK_LEFT = 80, TRACK_RIGHT = 20;
+  const viewportWidth = viewport.clientWidth;
+  const trackAvailWidth = viewportWidth - TRACK_LEFT - TRACK_RIGHT;
+  const sig = JSON.stringify(events) + '|' + viewportWidth + '|' + PIXELS_PER_MINUTE + '|' + viewDayOffset;
+
+  document.getElementById('empty').style.display = events.length ? 'none' : 'flex';
+
+  if (sig !== lastEventsSig) {
+    lastEventsSig = sig;
+    currentLayout = computeLayout(events, windowStart, windowEnd, trackAvailWidth);
+    buildCards(currentLayout, nowOffsetFromTrackTop);
+  }
+
+  updateCardPositions(currentLayout, nowOffsetFromTrackTop, now, effectiveScrollPx);
+
+  requestAnimationFrame(render);
+}
+
+// ── INIT ──────────────────────────────────────────────────
+function start() {
+  (async () => {
+    await load();
+    loadTasks();
+    initColourSwatches();
+    initLocAutocomplete();
+    render();
+  })();
+}
+
+// If pywebview is present, wait for it to be ready before loading.
+// In a browser there is no pywebviewready event, so we start immediately.
+if (typeof window.pywebview !== 'undefined' || document.location.protocol === 'file:') {
+  // Could be the EXE — wait up to 3s for pywebviewready, then start anyway.
+  let started = false;
+  window.addEventListener('pywebviewready', () => {
+    pywebviewReady = true;
+    if (!started) { started = true; start(); }
+  });
+  setTimeout(() => { if (!started) { started = true; start(); } }, 3000);
+} else {
+  start();
+}
+</script>
+</body>
+</html>
